@@ -15,21 +15,27 @@ Route::get('/test', function () {
     ]);
 });
 
-// Public routes (no authentication required)
-Route::post('/auth/login', [AuthController::class, 'login']);
-Route::post('/users', [UserController::class, 'store']); // User registration
+// Public authentication routes
+Route::group(['prefix' => 'auth'], function () {
+    Route::post('register', [AuthController::class, 'register']);
+    Route::post('login', [AuthController::class, 'login']);
+    Route::post('logout', [AuthController::class, 'logout']);
+    Route::post('refresh', [AuthController::class, 'refresh']);
+    Route::get('me', [AuthController::class, 'me']);
+    Route::post('validate', [AuthController::class, 'validateToken']); // For inter-service validation
+});
 
-// Get all users (for the frontend)
+// Public routes (for now, we'll protect these later)
 Route::get('/users', [UserController::class, 'index']);
+Route::post('/users', [UserController::class, 'store']);
 Route::get('/users/{id}', [UserController::class, 'show']);
-Route::put('/users/{id}', [UserController::class, 'update']); // Move this here (public)
-// Add this to the public routes section
+Route::put('/users/{id}', [UserController::class, 'update']);
 Route::delete('/users/{id}', [UserController::class, 'destroy']);
+
 // Protected routes (require authentication)
-Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/auth/logout', [AuthController::class, 'logout']);
-    Route::get('/auth/me', [AuthController::class, 'me']);
-    // Route::put('/users/{id}', [UserController::class, 'update']); // Remove from here
+Route::middleware('auth:api')->group(function () {
+    // Add protected routes here later
+    Route::get('/profile', [AuthController::class, 'me']);
 });
 
 // Internal routes (for microservice communication)
