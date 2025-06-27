@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Validator;
 
 class UserController extends Controller
 {
-    // // Register User (POST /api/users)
+    // Register User (POST /api/users)
     public function store(Request $request)
     {
         $validator = Validator::make($request->all(), [
@@ -66,14 +66,24 @@ class UserController extends Controller
             'name' => 'sometimes|string|max:255',
             'username' => 'sometimes|string|max:255|unique:users,username,' . $id,
             'email' => 'sometimes|string|email|max:255|unique:users,email,' . $id,
+            'role' => 'sometimes|in:creator,buyer,admin',
             'bio' => 'nullable|string',
+            'is_verified' => 'sometimes|boolean',
         ]);
 
         if ($validator->fails()) {
             return response()->json(['errors' => $validator->errors()], 422);
         }
 
-        $user->update($request->only(['name', 'username', 'email', 'bio']));
+        // Update allowed fields
+        $updateData = $request->only(['name', 'username', 'email', 'role', 'bio']);
+        
+        // Handle is_verified specifically
+        if ($request->has('is_verified')) {
+            $updateData['is_verified'] = $request->boolean('is_verified');
+        }
+
+        $user->update($updateData);
 
         return response()->json([
             'message' => 'User updated successfully',
@@ -82,15 +92,23 @@ class UserController extends Controller
     }
 
     // Get All Users (for admin/internal use)
-    // In UserController, update the index method
     public function index()
     {
-        $users = User::all();
-        return response()->json($users->map(function ($user) {
-            return $user->toApiArray();
-        }));
+        try {
+            $users = User::all();
+            
+            return response()->json($users->map(function ($user) {
+                return $user->toApiArray();
+            }));
+        } catch (\Exception $e) {
+            return response()->json([
+                'message' => 'Error loading users',
+                'error' => $e->getMessage()
+            ], 500);
+        }
     }
-    // Add this method to UserController
+
+    // Delete User
     public function destroy($id)
     {
         $user = User::find($id);

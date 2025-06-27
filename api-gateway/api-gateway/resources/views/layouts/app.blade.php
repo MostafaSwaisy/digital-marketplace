@@ -75,9 +75,9 @@
                         </a>
                     </li>
                     <li class="nav-item">
-                        <a class="nav-link {{ request()->is('products*') ? 'active' : '' }}"
-                            href="{{ url('/products') }}">
-                            <i class="fas fa-box"></i> Browse Products
+                        <a class="nav-link {{ request()->is('browse*') ? 'active' : '' }}"
+                            href="{{ url('/browse') }}">
+                            <i class="fas fa-search"></i> Browse Products
                         </a>
                     </li>
 
@@ -89,9 +89,21 @@
                         </a>
                     </li>
                     <li class="nav-item admin-only d-none">
-                        <a class="nav-link {{ request()->is('admin/users*') ? 'active' : '' }}"
-                            href="{{ url('/admin/users') }}">
+                        <a class="nav-link {{ request()->is('users*') ? 'active' : '' }}"
+                            href="{{ url('/users') }}">
                             <i class="fas fa-users"></i> Manage Users
+                        </a>
+                    </li>
+                    <li class="nav-item admin-only d-none">
+                        <a class="nav-link {{ request()->is('products*') ? 'active' : '' }}"
+                            href="{{ url('/products') }}">
+                            <i class="fas fa-box"></i> Manage Products
+                        </a>
+                    </li>
+                    <li class="nav-item admin-only d-none">
+                        <a class="nav-link {{ request()->is('orders*') ? 'active' : '' }}"
+                            href="{{ url('/orders') }}">
+                            <i class="fas fa-shopping-cart"></i> Manage Orders
                         </a>
                     </li>
 
@@ -120,14 +132,6 @@
                         <a class="nav-link {{ request()->is('buyer/orders*') ? 'active' : '' }}"
                             href="{{ url('/buyer/orders') }}">
                             <i class="fas fa-shopping-cart"></i> My Orders
-                        </a>
-                    </li>
-
-                    <!-- Shared Links (for logged-in users) -->
-                    <li class="nav-item authenticated-only d-none">
-                        <a class="nav-link {{ request()->is('orders*') ? 'active' : '' }}"
-                            href="{{ url('/orders') }}">
-                            <i class="fas fa-list"></i> All Orders
                         </a>
                     </li>
                 </ul>
@@ -628,74 +632,91 @@ Joined: ${new Date(currentUser.created_at).toLocaleDateString()}
             Object.keys(services).forEach(testService);
         }
 
-        // LOGIN FORM HANDLER - This was missing!
-        document.getElementById('loginForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
+        // Updated login handler for your layouts/app.blade.php
 
-            const email = document.getElementById('loginEmail').value;
-            const password = document.getElementById('loginPassword').value;
-
-            console.log('=== LOGIN ATTEMPT ===');
-            console.log('Email:', email);
-
-            try {
-                const result = await apiCall('/api/auth/login', 'POST', {
-                    email: email,
-                    password: password
-                });
-
-                console.log('=== LOGIN RESULT ===');
-                console.log('Result:', result);
-
-                if (result.success && result.data.token && result.data.user) {
-                    console.log('=== LOGIN SUCCESS ===');
-
-                    // Store authentication data
-                    localStorage.setItem('auth_token', result.data.token);
-                    localStorage.setItem('auth_user', JSON.stringify(result.data.user));
-
-                    // Update global variables
-                    authToken = result.data.token;
-                    currentUser = result.data.user;
-
-                    console.log('Stored user:', currentUser);
-                    console.log('Stored token:', authToken);
-
-                    // Update UI immediately
-                    updateAuthUI(true);
-
-                    // Close modal
-                    const modal = bootstrap.Modal.getInstance(document.getElementById('loginModal'));
-                    if (modal) {
-                        modal.hide();
-                    }
-
-                    // Show success message
-                    showAlert(`Welcome back, ${result.data.user.name || result.data.user.username}!`,
-                    'success');
-
-                    // Reset form
-                    document.getElementById('loginForm').reset();
-
-                    // Redirect to dashboard
-                    console.log('Redirecting to dashboard for role:', result.data.user.role);
-                    setTimeout(() => {
-                        redirectToDashboard(result.data.user.role);
-                    }, 1500);
-
-                } else {
-                    console.log('=== LOGIN FAILED ===');
-                    console.log('Error data:', result.data);
-                    const errorMsg = result.data?.message || 'Login failed. Please check your credentials.';
-                    showAlert(errorMsg, 'danger', 'loginAlerts');
-                }
-            } catch (error) {
-                console.error('=== LOGIN ERROR ===');
-                console.error('Login error:', error);
-                showAlert('Error connecting to server. Please try again.', 'danger', 'loginAlerts');
-            }
+document.getElementById('loginForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    const email = document.getElementById('loginEmail').value;
+    const password = document.getElementById('loginPassword').value;
+    
+    console.log('=== LOGIN ATTEMPT ===');
+    console.log('Email:', email);
+    
+    try {
+        const response = await fetch('/api/auth/login', {
+            method: 'POST',
+            headers: {
+                'Content-Type': 'application/json',
+                'Accept': 'application/json',
+                'X-CSRF-TOKEN': csrfToken
+            },
+            body: JSON.stringify({
+                email: email,
+                password: password
+            })
         });
-
+        
+        console.log('Login response status:', response.status);
+        const result = await response.json();
+        console.log('Login response data:', result);
+        
+        // Check for success in the response
+        if (response.ok && result.success && result.token && result.user) {
+            console.log('=== LOGIN SUCCESS ===');
+            console.log('Token:', result.token);
+            console.log('User:', result.user);
+            
+            // Store authentication data
+            localStorage.setItem('auth_token', result.token);
+            localStorage.setItem('auth_user', JSON.stringify(result.user));
+            
+            // Update global variables
+            authToken = result.token;
+            currentUser = result.user;
+            
+            console.log('Stored user:', currentUser);
+            console.log('Stored token:', authToken);
+            
+            // Update UI immediately
+            updateAuthUI(true);
+            
+            // Close modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('loginModal'));
+            if (modal) {
+                modal.hide();
+                console.log('Modal closed');
+            }
+            
+            // Show success message
+            showAlert(`Welcome back, ${result.user.name || result.user.username}!`, 'success');
+            
+            // Reset form
+            document.getElementById('loginForm').reset();
+            
+            // Redirect to dashboard
+            console.log('Redirecting to dashboard for role:', result.user.role);
+            setTimeout(() => {
+                redirectToDashboard(result.user.role);
+            }, 1500);
+            
+        } else {
+            console.log('=== LOGIN FAILED ===');
+            console.log('Response ok:', response.ok);
+            console.log('Result success:', result.success);
+            console.log('Has token:', !!result.token);
+            console.log('Has user:', !!result.user);
+            
+            const errorMsg = result.message || 'Login failed. Please check your credentials.';
+            showAlert(errorMsg, 'danger', 'loginAlerts');
+        }
+        
+    } catch (error) {
+        console.error('=== LOGIN ERROR ===');
+        console.error('Login error:', error);
+        showAlert('Error connecting to server. Please try again.', 'danger', 'loginAlerts');
+    }
+});
         // REGISTER FORM HANDLER - This was missing!
         document.getElementById('registerForm').addEventListener('submit', async function(e) {
             e.preventDefault();

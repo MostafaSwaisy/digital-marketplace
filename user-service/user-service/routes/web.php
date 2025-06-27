@@ -1,7 +1,5 @@
 <?php
 
-use App\Http\Controllers\Api\AuthController;
-use App\Http\Controllers\Api\UserController;
 use Illuminate\Support\Facades\Route;
 use Illuminate\Support\Facades\Auth;
 
@@ -20,19 +18,6 @@ Route::get('/', function () {
     return view('welcome');
 });
 
+// Only include Laravel's default auth routes if you need web authentication
+// Comment out or remove these if you only want API authentication
 Auth::routes();
-
-// Public routes
-Route::post('/auth/login', [AuthController::class, 'login']);
-Route::post('/users', [UserController::class, 'store']); // Register
-
-// Protected routes
-Route::middleware('auth:sanctum')->group(function () {
-    Route::post('/auth/logout', [AuthController::class, 'logout']);
-    Route::get('/auth/me', [AuthController::class, 'me']);
-    Route::get('/users/{id}', [UserController::class, 'show']);
-    Route::put('/users/{id}', [UserController::class, 'update']);
-});
-
-// Internal routes (for microservice communication)
-Route::get('/users', [UserController::class, 'index']);

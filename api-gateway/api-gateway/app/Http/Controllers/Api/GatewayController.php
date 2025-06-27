@@ -9,20 +9,44 @@ use Illuminate\Support\Facades\Http;
 class GatewayController extends Controller
 {
     // Proxy requests to User Service// Update these methods in GatewayController
+    // Make sure your userProxy method looks like this:
     public function userProxy(Request $request, $path = null)
     {
-        // Get the current route path after /api/
-        $currentPath = $request->route()->uri();
-        $servicePath = str_replace('api/', '', $currentPath);
+        try {
+            // Log the incoming request
+            \Illuminate\Support\Facades\Log::info('Gateway: Proxying user request', [
+                'method' => $request->method(),
+                'uri' => $request->getRequestUri(),
+                'path' => $path,
+                'data' => $request->all()
+            ]);
 
-        $url = 'http://localhost:8001/api/' . $servicePath;
+            // Get the current route path after /api/
+            $currentPath = $request->route()->uri();
+            $servicePath = str_replace('api/', '', $currentPath);
 
-        // Replace {id} with actual ID value
-        if ($request->route('id')) {
-            $url = str_replace('{id}', $request->route('id'), $url);
+            $url = 'http://localhost:8001/api/' . $servicePath;
+
+            // Replace {id} with actual ID value
+            if ($request->route('id')) {
+                $url = str_replace('{id}', $request->route('id'), $url);
+            }
+
+            \Illuminate\Support\Facades\Log::info('Gateway: Calling User Service', ['url' => $url]);
+
+            return $this->proxyRequest($request, $url);
+
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Gateway: User proxy error', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+
+            return response()->json([
+                'error' => 'Gateway error',
+                'message' => $e->getMessage()
+            ], 500);
         }
-
-        return $this->proxyRequest($request, $url);
     }
 
     // Proxy requests to Product Service // Proxy requests to Product Service
@@ -31,14 +55,14 @@ class GatewayController extends Controller
         // Get the current route path after /api/
         $currentPath = $request->route()->uri();
         $servicePath = str_replace('api/', '', $currentPath);
-        
+
         $url = 'http://localhost:8002/api/' . $servicePath;
-        
+
         // Replace {id} with actual ID value
         if ($request->route('id')) {
             $url = str_replace('{id}', $request->route('id'), $url);
         }
-        
+
         return $this->proxyRequest($request, $url);
     }
     // Proxy requests to Order Service
@@ -48,63 +72,81 @@ class GatewayController extends Controller
         // Get the current route path after /api/
         $currentPath = $request->route()->uri();
         $servicePath = str_replace('api/', '', $currentPath);
-        
+
         $url = 'http://localhost:8003/api/' . $servicePath;
-        
+
         // Replace {id} with actual ID value
         if ($request->route('id')) {
             $url = str_replace('{id}', $request->route('id'), $url);
         }
-        
+
         return $this->proxyRequest($request, $url);
     }
 
     // Helper method to proxy HTTP requests
-    private function proxyRequest(Request $request, $url)
-    {
-        try {
-            $method = strtolower($request->method());
-            $headers = [
-                'Accept' => 'application/json',
-                'Content-Type' => 'application/json',
-            ];
+ 
+// Also check your proxyRequest method:
+private function proxyRequest(Request $request, $url)
+{
+    try {
+        \Illuminate\Support\Facades\Log::info('Gateway: Making proxy request', [
+            'method' => $request->method(),
+            'url' => $url,
+            'data' => $request->all()
+        ]);
 
-            // Forward authorization header if present
-            if ($request->hasHeader('Authorization')) {
-                $headers['Authorization'] = $request->header('Authorization');
-            }
+        $method = strtolower($request->method());
+        $headers = [
+            'Accept' => 'application/json',
+            'Content-Type' => 'application/json',
+        ];
 
-            $httpClient = Http::withHeaders($headers);
-
-            switch ($method) {
-                case 'get':
-                    $response = $httpClient->get($url, $request->query());
-                    break;
-                case 'post':
-                    $response = $httpClient->post($url, $request->all());
-                    break;
-                case 'put':
-                    $response = $httpClient->put($url, $request->all());
-                    break;
-                case 'delete':
-                    $response = $httpClient->delete($url, $request->all());
-                    break;
-                default:
-                    return response()->json(['error' => 'Method not supported'], 405);
-            }
-
-            return response($response->body(), $response->status())
-                ->header('Content-Type', 'application/json');
-
-        } catch (\Exception $e) {
-            return response()->json([
-                'error' => 'Service unavailable',
-                'message' => $e->getMessage(),
-                'url' => $url // Debug: show what URL was called
-            ], 503);
+        // Forward authorization header if present
+        if ($request->hasHeader('Authorization')) {
+            $headers['Authorization'] = $request->header('Authorization');
         }
-    }
 
+        $httpClient = Http::withHeaders($headers);
+
+        switch ($method) {
+            case 'get':
+                $response = $httpClient->get($url, $request->query());
+                break;
+            case 'post':
+                $response = $httpClient->post($url, $request->all());
+                break;
+            case 'put':
+                $response = $httpClient->put($url, $request->all());
+                break;
+            case 'delete':
+                $response = $httpClient->delete($url, $request->all());
+                break;
+            default:
+                return response()->json(['error' => 'Method not supported'], 405);
+        }
+
+        \Illuminate\Support\Facades\Log::info('Gateway: User Service response', [
+            'status' => $response->status(),
+            'body' => $response->body()
+        ]);
+
+        return response($response->body(), $response->status())
+            ->header('Content-Type', 'application/json');
+
+    } catch (\Exception $e) {
+        \Illuminate\Support\Facades\Log::error('Gateway: Proxy request error', [
+            'url' => $url,
+            'error' => $e->getMessage(),
+            'trace' => $e->getTraceAsString()
+        ]);
+
+        return response()->json([
+            'error' => 'Service unavailable',
+            'message' => $e->getMessage(),
+            'url' => $url
+        ], 503);
+    }
+}
     // Combined dashboard endpoint
     public function dashboard(Request $request)
     {

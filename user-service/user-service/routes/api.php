@@ -5,27 +5,39 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\Api\UserController;
 use App\Http\Controllers\Api\AuthController;
 
+/*
+|--------------------------------------------------------------------------
+| API Routes
+|--------------------------------------------------------------------------
+*/
+
 // Test route
 Route::get('/test', function () {
     return response()->json([
         'message' => 'User Service API is working!',
         'service' => 'User Service',
         'version' => '1.0',
-        'timestamp' => now()
+        'timestamp' => now(),
+        'routes' => [
+            'POST /api/auth/register',
+            'POST /api/auth/login',
+            'GET /api/users',
+            'POST /api/users'
+        ]
     ]);
 });
 
-// Public authentication routes
-Route::group(['prefix' => 'auth'], function () {
+// Authentication routes
+Route::prefix('auth')->group(function () {
     Route::post('register', [AuthController::class, 'register']);
     Route::post('login', [AuthController::class, 'login']);
     Route::post('logout', [AuthController::class, 'logout']);
     Route::post('refresh', [AuthController::class, 'refresh']);
     Route::get('me', [AuthController::class, 'me']);
-    Route::post('validate', [AuthController::class, 'validateToken']); // For inter-service validation
+    Route::post('validate', [AuthController::class, 'validateToken']);
 });
 
-// Public routes (for now, we'll protect these later)
+// User management routes
 Route::get('/users', [UserController::class, 'index']);
 Route::post('/users', [UserController::class, 'store']);
 Route::get('/users/{id}', [UserController::class, 'show']);
@@ -34,7 +46,6 @@ Route::delete('/users/{id}', [UserController::class, 'destroy']);
 
 // Protected routes (require authentication)
 Route::middleware('auth:api')->group(function () {
-    // Add protected routes here later
     Route::get('/profile', [AuthController::class, 'me']);
 });
 

@@ -77,7 +77,7 @@
                 </div>
                 <div class="card-body">
                     <div class="d-grid gap-2 d-md-flex">
-                        <a href="/admin/users" class="btn btn-primary">
+                        <a href="/users" class="btn btn-primary">
                             <i class="fas fa-users"></i> Manage Users
                         </a>
                         <a href="/products" class="btn btn-success">
@@ -136,35 +136,89 @@
             </div>
         </div>
     </div>
+
+    <!-- Recent Data Preview -->
+    <div class="row mt-4">
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">Recent Users</h6>
+                    <a href="/users" class="btn btn-sm btn-outline-primary">View All</a>
+                </div>
+                <div class="card-body">
+                    <div id="recentUsers">
+                        <div class="text-center">
+                            <div class="spinner-border spinner-border-sm" role="status"></div>
+                            Loading...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">Recent Products</h6>
+                    <a href="/products" class="btn btn-sm btn-outline-success">View All</a>
+                </div>
+                <div class="card-body">
+                    <div id="recentProducts">
+                        <div class="text-center">
+                            <div class="spinner-border spinner-border-sm" role="status"></div>
+                            Loading...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="col-md-4">
+            <div class="card">
+                <div class="card-header d-flex justify-content-between align-items-center">
+                    <h6 class="mb-0">Recent Orders</h6>
+                    <a href="/orders" class="btn btn-sm btn-outline-warning">View All</a>
+                </div>
+                <div class="card-body">
+                    <div id="recentOrders">
+                        <div class="text-center">
+                            <div class="spinner-border spinner-border-sm" role="status"></div>
+                            Loading...
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
 @endsection
 
 @section('scripts')
     <script>
         // Check if user is admin
         document.addEventListener('DOMContentLoaded', function() {
-            // Check if user is admin
             if (!currentUser || currentUser.role !== 'admin') {
                 showAlert('Access denied. Admin privileges required.', 'danger');
                 window.location.href = '/';
                 return;
             }
 
-            // Continue with page-specific code
+            // Load admin dashboard data
             loadAdminDashboard();
             testServices();
         });
+
         async function loadAdminDashboard() {
             try {
                 // Load users count
                 const usersResult = await apiCall('/api/users');
                 if (usersResult.success && Array.isArray(usersResult.data)) {
                     document.getElementById('totalUsers').textContent = usersResult.data.length;
+                    displayRecentUsers(usersResult.data.slice(0, 5));
                 }
 
                 // Load products count
                 const productsResult = await apiCall('/api/products');
                 if (productsResult.success && productsResult.data.pagination) {
                     document.getElementById('totalProducts').textContent = productsResult.data.pagination.total;
+                    displayRecentProducts(productsResult.data.products.slice(0, 5));
                 }
 
                 // Load orders count and revenue
@@ -172,6 +226,7 @@
                 if (ordersResult.success && ordersResult.data.orders) {
                     const orders = ordersResult.data.orders;
                     document.getElementById('totalOrders').textContent = orders.length;
+                    displayRecentOrders(orders.slice(0, 5));
 
                     const totalRevenue = orders
                         .filter(order => order.status === 'completed')
@@ -238,10 +293,93 @@
             }
         }
 
+        function displayRecentUsers(users) {
+            const container = document.getElementById('recentUsers');
+            if (users.length === 0) {
+                container.innerHTML = '<p class="text-muted">No users found</p>';
+                return;
+            }
+
+            container.innerHTML = users.map(user => `
+                <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                    <div>
+                        <strong>${user.name || user.username}</strong>
+                        <br><small class="text-muted">${user.role}</small>
+                    </div>
+                    <span class="badge bg-${getRoleBadgeColor(user.role)}">${user.role}</span>
+                </div>
+            `).join('');
+        }
+
+        function displayRecentProducts(products) {
+            const container = document.getElementById('recentProducts');
+            if (products.length === 0) {
+                container.innerHTML = '<p class="text-muted">No products found</p>';
+                return;
+            }
+
+            container.innerHTML = products.map(product => `
+                <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                    <div>
+                        <strong>${product.name}</strong>
+                        <br><small class="text-muted">$${parseFloat(product.price).toFixed(2)}</small>
+                    </div>
+                    <span class="badge bg-${getStatusBadgeColor(product.status)}">${product.status}</span>
+                </div>
+            `).join('');
+        }
+
+        function displayRecentOrders(orders) {
+            const container = document.getElementById('recentOrders');
+            if (orders.length === 0) {
+                container.innerHTML = '<p class="text-muted">No orders found</p>';
+                return;
+            }
+
+            container.innerHTML = orders.map(order => `
+                <div class="d-flex justify-content-between align-items-center py-2 border-bottom">
+                    <div>
+                        <strong>${order.order_number}</strong>
+                        <br><small class="text-muted">$${parseFloat(order.total_amount).toFixed(2)}</small>
+                    </div>
+                    <span class="badge bg-${getOrderStatusColor(order.status)}">${order.status}</span>
+                </div>
+            `).join('');
+        }
+
         function loadSystemOverview() {
             loadAdminDashboard();
             testServices();
             showAlert('Dashboard data refreshed', 'success');
+        }
+
+        // Helper functions
+        function getRoleBadgeColor(role) {
+            const colors = {
+                'admin': 'danger',
+                'creator': 'success',
+                'buyer': 'primary'
+            };
+            return colors[role] || 'secondary';
+        }
+
+        function getStatusBadgeColor(status) {
+            const colors = {
+                'draft': 'secondary',
+                'published': 'success',
+                'suspended': 'danger'
+            };
+            return colors[status] || 'secondary';
+        }
+
+        function getOrderStatusColor(status) {
+            const colors = {
+                'pending': 'warning',
+                'completed': 'success',
+                'failed': 'danger',
+                'refunded': 'info'
+            };
+            return colors[status] || 'secondary';
         }
     </script>
 @endsection

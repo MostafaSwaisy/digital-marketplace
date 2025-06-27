@@ -48,20 +48,25 @@ Route::get('/buyer/orders', function () {
     return view('buyer.orders');
 })->name('buyer.orders');
 
-// Shared routes (accessible by logged-in users)
+// Management routes (accessible by admins and appropriate roles)
+Route::get('/users', function () {
+    return view('users.index');
+})->name('users.index');
+
 Route::get('/products', function () {
-    return view('products.browse');
-})->name('products.browse');
+    return view('products.index');
+})->name('products.index');
 
 Route::get('/orders', function () {
     return view('orders.index');
 })->name('orders.index');
 
-// Legacy routes (redirect to appropriate dashboards)
-Route::get('/users', function () {
-    return redirect('/admin/users');
-});
+// Browse products page for public
+Route::get('/browse', function () {
+    return view('products.browse');
+})->name('products.browse');
 
+// Legacy routes (redirect to appropriate dashboards)
 Route::get('/dashboard', function () {
     return redirect('/admin/dashboard');
 });

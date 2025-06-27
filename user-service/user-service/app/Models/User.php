@@ -31,7 +31,6 @@ class User extends Authenticatable implements JWTSubject
     protected $casts = [
         'email_verified_at' => 'datetime',
         'is_verified' => 'boolean',
-        // 'password' => 'hashed',
     ];
 
     // JWT Methods
@@ -49,19 +48,18 @@ class User extends Authenticatable implements JWTSubject
         ];
     }
 
-    // API response format - Fixed formatting
-    // API response format - SIMPLIFIED VERSION
+    // API response format - FIXED VERSION
     public function toApiArray()
     {
         return [
-            'id' => $this->id ?? null,
-            'name' => $this->name ?? null,
-            'username' => $this->username ?? null,
-            'email' => $this->email ?? null,
-            'role' => $this->role ?? null,
-            'bio' => $this->bio ?? null,
-            'profile_image' => $this->profile_image ?? null,
-            'is_verified' => $this->is_verified ?? false,
+            'id' => $this->id,
+            'name' => $this->name,
+            'username' => $this->username,
+            'email' => $this->email,
+            'role' => $this->role,
+            'bio' => $this->bio,
+            'profile_image' => $this->profile_image,
+            'is_verified' => (bool) $this->is_verified,
             'created_at' => $this->created_at ? $this->created_at->toISOString() : null,
             'updated_at' => $this->updated_at ? $this->updated_at->toISOString() : null,
         ];
