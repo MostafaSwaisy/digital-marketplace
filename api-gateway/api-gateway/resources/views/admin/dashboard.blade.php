@@ -142,16 +142,6 @@
     <script>
         // Check if user is admin
         document.addEventListener('DOMContentLoaded', function() {
-            if (!currentUser || currentUser.role !== 'admin') {
-                showAlert('Access denied. Admin privileges required.', 'danger');
-                window.location.href = '/';
-                return;
-            }
-
-            // Continue with existing users management code
-            loadUsers();
-        });
-        document.addEventListener('DOMContentLoaded', function() {
             // Check if user is admin
             if (!currentUser || currentUser.role !== 'admin') {
                 showAlert('Access denied. Admin privileges required.', 'danger');
@@ -159,10 +149,10 @@
                 return;
             }
 
+            // Continue with page-specific code
             loadAdminDashboard();
             testServices();
         });
-
         async function loadAdminDashboard() {
             try {
                 // Load users count

@@ -290,6 +290,324 @@
     <!-- Scripts -->
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.1.3/dist/js/bootstrap.bundle.min.js"></script>
     <script>
+        // Complete Authentication Functions - Add this to layouts/app.blade.php after the existing scripts
+
+        // Show register modal
+        // Show register modal
+        function showRegisterModal() {
+            // Hide login modal if open
+            const loginModal = bootstrap.Modal.getInstance(document.getElementById('loginModal'));
+            if (loginModal) {
+                loginModal.hide();
+            }
+
+            // Show register modal
+            const registerModal = new bootstrap.Modal(document.getElementById('registerModal'));
+            registerModal.show();
+        }
+
+        // Show login modal
+        function showLoginModal() {
+            // Hide register modal if open
+            const registerModal = bootstrap.Modal.getInstance(document.getElementById('registerModal'));
+            if (registerModal) {
+                registerModal.hide();
+            }
+
+            // Show login modal
+            const loginModal = new bootstrap.Modal(document.getElementById('loginModal'));
+            loginModal.show();
+        }
+
+        // Login form submission handler
+        // Login form submission handler
+        document.getElementById('loginForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const email = document.getElementById('loginEmail').value;
+            const password = document.getElementById('loginPassword').value;
+
+            console.log('Attempting login for:', email);
+
+            try {
+                const result = await apiCall('/api/auth/login', 'POST', {
+                    email: email,
+                    password: password
+                });
+
+                console.log('Login result:', result);
+
+                if (result.success && result.data.token && result.data.user) {
+                    // 1. Store authentication data
+                    localStorage.setItem('auth_token', result.data.token);
+                    localStorage.setItem('auth_user', JSON.stringify(result.data.user));
+
+                    // 2. Update global variables
+                    authToken = result.data.token;
+                    currentUser = result.data.user;
+
+                    // 3. Update UI immediately (this fixes the navbar)
+                    updateAuthUI(true);
+
+                    // 4. Close modal (this fixes the modal staying open)
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('loginModal'));
+                    if (modal) {
+                        modal.hide();
+                    }
+
+                    // 5. Show success message
+                    showAlert(`Welcome back, ${result.data.user.name || result.data.user.username}!`,
+                    'success');
+
+                    // 6. Reset form
+                    document.getElementById('loginForm').reset();
+
+                    // 7. Redirect to dashboard based on role (this fixes the redirect)
+                    setTimeout(() => {
+                        redirectToDashboard(result.data.user.role);
+                    }, 1500);
+
+                } else {
+                    const errorMsg = result.data?.message || 'Login failed. Please check your credentials.';
+                    showAlert(errorMsg, 'danger', 'loginAlerts');
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                showAlert('Error connecting to server. Please try again.', 'danger', 'loginAlerts');
+            }
+        });
+
+        // Register form submission handler
+        document.getElementById('registerForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+
+            const password = document.getElementById('registerPassword').value;
+            const passwordConfirm = document.getElementById('registerPasswordConfirm').value;
+
+            // Check password confirmation
+            if (password !== passwordConfirm) {
+                showAlert('Passwords do not match.', 'danger', 'registerAlerts');
+                return;
+            }
+
+            const userData = {
+                name: document.getElementById('registerName').value,
+                username: document.getElementById('registerUsername').value,
+                email: document.getElementById('registerEmail').value,
+                password: password,
+                password_confirmation: passwordConfirm,
+                role: document.getElementById('registerRole').value,
+                bio: document.getElementById('registerBio').value
+            };
+
+            console.log('Attempting registration for:', userData.email);
+
+            try {
+                const result = await apiCall('/api/auth/register', 'POST', userData);
+
+                console.log('Registration result:', result);
+
+                if (result.success && result.data.token && result.data.user) {
+                    // Store authentication data
+                    localStorage.setItem('auth_token', result.data.token);
+                    localStorage.setItem('auth_user', JSON.stringify(result.data.user));
+
+                    // Update global variables
+                    authToken = result.data.token;
+                    currentUser = result.data.user;
+
+                    // Update UI immediately
+                    updateAuthUI(true);
+
+                    // Close modal
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('registerModal'));
+                    modal.hide();
+
+                    // Show success message
+                    showAlert(
+                        `Welcome to Digital Marketplace, ${result.data.user.name || result.data.user.username}!`,
+                        'success');
+
+                    // Reset form
+                    document.getElementById('registerForm').reset();
+
+                    // Redirect to appropriate dashboard after delay
+                    setTimeout(() => {
+                        redirectToDashboard(result.data.user.role);
+                    }, 1500);
+
+                } else {
+                    const errorMsg = result.data?.message || 'Registration failed. Please try again.';
+                    showAlert(errorMsg, 'danger', 'registerAlerts');
+                }
+            } catch (error) {
+                console.error('Registration error:', error);
+                showAlert('Error connecting to server. Please try again.', 'danger', 'registerAlerts');
+            }
+        });
+
+        // Logout function
+        async function logout() {
+            if (!confirm('Are you sure you want to logout?')) {
+                return;
+            }
+
+            try {
+                // Call logout API (optional - for server-side cleanup)
+                if (authToken) {
+                    await apiCall('/api/auth/logout', 'POST');
+                }
+            } catch (error) {
+                console.log('Logout API call failed, but continuing with local cleanup');
+            }
+
+            // Clear local storage
+            localStorage.removeItem('auth_token');
+            localStorage.removeItem('auth_user');
+
+            // Clear global variables
+            authToken = null;
+            currentUser = null;
+
+            // Update UI
+            updateAuthUI(false);
+
+            // Show goodbye message
+            showAlert('You have been logged out successfully.', 'info');
+
+            // Redirect to home page
+            setTimeout(() => {
+                window.location.href = '/';
+            }, 1500);
+        }
+
+        // Show user profile (placeholder)
+        function showProfile() {
+            if (!currentUser) {
+                showAlert('Please login to view your profile.', 'warning');
+                return;
+            }
+
+            const profileInfo = `
+Profile Information:
+Name: ${currentUser.name || 'Not set'}
+Username: ${currentUser.username}
+Email: ${currentUser.email}
+Role: ${currentUser.role}
+Bio: ${currentUser.bio || 'No bio provided'}
+Joined: ${new Date(currentUser.created_at).toLocaleDateString()}
+    `;
+
+            alert(profileInfo);
+            // TODO: Replace with a proper profile modal
+        }
+
+        // Redirect function (you need this too)
+        function redirectToDashboard(role) {
+            const dashboards = {
+                'admin': '/admin/dashboard',
+                'creator': '/creator/dashboard',
+                'buyer': '/buyer/dashboard'
+            };
+
+            const dashboardUrl = dashboards[role] || '/';
+            console.log(`Redirecting ${role} to ${dashboardUrl}`);
+            window.location.href = dashboardUrl;
+        }
+
+        // Enhanced API call function with authentication
+        async function apiCall(url, method = 'GET', data = null) {
+            const options = {
+                method: method,
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                    'X-CSRF-TOKEN': csrfToken
+                }
+            };
+
+            // Add authorization header if we have a token
+            if (authToken) {
+                options.headers['Authorization'] = `Bearer ${authToken}`;
+            }
+
+            if (data) {
+                options.body = JSON.stringify(data);
+            }
+
+            try {
+                console.log(`API Call: ${method} ${url}`, data);
+                const response = await fetch(url, options);
+                const result = await response.json();
+
+                // Handle token expiration
+                if (response.status === 401 && authToken) {
+                    console.log('Token expired, logging out...');
+                    logout();
+                    return {
+                        success: false,
+                        error: 'Session expired'
+                    };
+                }
+
+                return {
+                    success: response.ok,
+                    data: result,
+                    status: response.status
+                };
+            } catch (error) {
+                console.error('API call failed:', error);
+                return {
+                    success: false,
+                    error: error.message
+                };
+            }
+        }
+        // Auto-suggest dashboard when logged in user visits home page
+        document.addEventListener('DOMContentLoaded', function() {
+            // If user is logged in and on home page, suggest going to dashboard
+            if (currentUser && window.location.pathname === '/') {
+                setTimeout(() => {
+                    const roleText = currentUser.role === 'admin' ? 'Admin' :
+                        currentUser.role === 'creator' ? 'Creator' : 'Buyer';
+
+                    // Show a non-intrusive suggestion
+                    const suggestionHtml = `
+                <div class="alert alert-info alert-dismissible fade show" role="alert">
+                    <strong>Welcome back, ${currentUser.name || currentUser.username}!</strong> 
+                    Would you like to go to your <a href="#" onclick="goToDashboard()" class="alert-link">${roleText} Dashboard</a>?
+                    <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                </div>
+            `;
+
+                    // Insert at top of main content
+                    const mainContent = document.querySelector('main .container');
+                    if (mainContent) {
+                        mainContent.insertAdjacentHTML('afterbegin', suggestionHtml);
+                    }
+                }, 2000);
+            }
+        });
+
+        // Handle browser back/forward navigation
+        window.addEventListener('popstate', function() {
+            checkPageAccess();
+        });
+
+        // Refresh token periodically (optional enhancement)
+        setInterval(async function() {
+            if (authToken && currentUser) {
+                try {
+                    const result = await apiCall('/api/auth/me');
+                    if (!result.success) {
+                        console.log('Token validation failed, logging out...');
+                        logout();
+                    }
+                } catch (error) {
+                    console.log('Token refresh check failed');
+                }
+            }
+        }, 300000); // Check every 5 minutes
         // Global authentication state
         let currentUser = null;
         let authToken = null;
@@ -314,6 +632,7 @@
         }
 
         // Update authentication UI with role-based visibility
+        // Make sure you also have the enhanced updateAuthUI function
         function updateAuthUI(isLoggedIn) {
             const loginNavItem = document.getElementById('loginNavItem');
             const userNavDropdown = document.getElementById('userNavDropdown');
@@ -326,8 +645,11 @@
             });
 
             if (isLoggedIn && currentUser) {
+                // Hide login buttons, show user dropdown
                 loginNavItem.classList.add('d-none');
                 userNavDropdown.classList.remove('d-none');
+
+                // Update user info in navbar
                 currentUserName.textContent = currentUser.name || currentUser.username;
                 currentUserRole.textContent = currentUser.role;
 
@@ -342,12 +664,16 @@
                     item.classList.remove('d-none');
                 });
 
+                console.log('UI updated for logged in user:', currentUser.role);
+
             } else {
+                // Show login buttons, hide user dropdown
                 loginNavItem.classList.remove('d-none');
                 userNavDropdown.classList.add('d-none');
+
+                console.log('UI updated for logged out state');
             }
         }
-
         // Go to appropriate dashboard based on role
         function goToDashboard() {
             if (!currentUser) return;
@@ -363,23 +689,192 @@
         }
 
         // Check if user has required role for current page
+        // Enhanced Page Protection - Add this to layouts/app.blade.php
+
+        // Enhanced checkPageAccess function with better protection
         function checkPageAccess() {
             const currentPath = window.location.pathname;
 
-            if (currentPath.startsWith('/admin/') && (!currentUser || currentUser.role !== 'admin')) {
-                showAlert('Access denied. Admin privileges required.', 'danger');
-                window.location.href = '/';
-                return false;
+            // Skip protection for public pages
+            const publicPages = ['/', '/products', '/login', '/register'];
+            if (publicPages.includes(currentPath)) {
+                return true;
             }
 
-            if (currentPath.startsWith('/creator/') && (!currentUser || currentUser.role !== 'creator')) {
-                showAlert('Access denied. Creator account required.', 'danger');
-                window.location.href = '/';
-                return false;
+            // If user is not logged in and trying to access protected pages
+            if (!currentUser || !authToken) {
+                const protectedPages = ['/admin/', '/creator/', '/buyer/', '/orders'];
+                const isProtectedPage = protectedPages.some(page => currentPath.startsWith(page));
+
+                if (isProtectedPage) {
+                    showAlert('Please login to access this page.', 'warning');
+
+                    // Show login modal instead of redirecting
+                    setTimeout(() => {
+                        showLoginModal();
+                    }, 1000);
+
+                    // Redirect to home after a delay
+                    setTimeout(() => {
+                        window.location.href = '/';
+                    }, 2000);
+
+                    return false;
+                }
+            }
+
+            // Role-based access control
+            if (currentUser && authToken) {
+                // Admin-only pages
+                if (currentPath.startsWith('/admin/')) {
+                    if (currentUser.role !== 'admin') {
+                        showAlert('Access denied. Admin privileges required.', 'danger');
+                        redirectToUserDashboard();
+                        return false;
+                    }
+                }
+
+                // Creator-only pages
+                if (currentPath.startsWith('/creator/')) {
+                    if (currentUser.role !== 'creator') {
+                        showAlert('Access denied. Creator account required.', 'danger');
+                        redirectToUserDashboard();
+                        return false;
+                    }
+                }
+
+                // Buyer-only pages
+                if (currentPath.startsWith('/buyer/')) {
+                    if (currentUser.role !== 'buyer') {
+                        showAlert('Access denied. Buyer account required.', 'danger');
+                        redirectToUserDashboard();
+                        return false;
+                    }
+                }
+
+                // Special case: /orders page (accessible by admin and buyers)
+                if (currentPath === '/orders') {
+                    if (!['admin', 'buyer'].includes(currentUser.role)) {
+                        showAlert('Access denied. You cannot view orders.', 'danger');
+                        redirectToUserDashboard();
+                        return false;
+                    }
+                }
+
+                // Special case: /products management (admin and creators)
+                if (currentPath === '/products' && currentUser.role === 'buyer') {
+                    // Buyers should go to browse page, not management page
+                    window.location.href = '/products/browse';
+                    return false;
+                }
             }
 
             return true;
         }
+
+        // Helper function to redirect user to their appropriate dashboard
+        function redirectToUserDashboard() {
+            if (!currentUser) {
+                window.location.href = '/';
+                return;
+            }
+
+            const dashboards = {
+                'admin': '/admin/dashboard',
+                'creator': '/creator/dashboard',
+                'buyer': '/buyer/dashboard'
+            };
+
+            const userDashboard = dashboards[currentUser.role] || '/';
+
+            setTimeout(() => {
+                window.location.href = userDashboard;
+            }, 1500);
+        }
+
+        // Enhanced auth status checking with token validation
+        async function validateAuthToken() {
+            if (!authToken || !currentUser) {
+                return false;
+            }
+
+            try {
+                // Try to validate token with backend
+                const result = await apiCall('/api/auth/me');
+
+                if (!result.success) {
+                    // Token is invalid, clear auth and redirect
+                    localStorage.removeItem('auth_token');
+                    localStorage.removeItem('auth_user');
+                    authToken = null;
+                    currentUser = null;
+                    updateAuthUI(false);
+
+                    showAlert('Your session has expired. Please login again.', 'warning');
+                    setTimeout(() => {
+                        window.location.href = '/';
+                    }, 2000);
+
+                    return false;
+                }
+
+                return true;
+            } catch (error) {
+                console.log('Token validation failed:', error);
+                return false;
+            }
+        }
+
+        // Run comprehensive auth checks on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check auth status first
+            checkAuthStatus();
+
+            // Then validate token and check page access
+            setTimeout(async () => {
+                if (authToken) {
+                    const isValidToken = await validateAuthToken();
+                    if (!isValidToken) {
+                        return; // Token validation already handled redirect
+                    }
+                }
+
+                // Check page access permissions
+                checkPageAccess();
+            }, 100);
+        });
+
+        // Check auth on page visibility change (when user comes back to tab)
+        document.addEventListener('visibilitychange', function() {
+            if (!document.hidden && authToken) {
+                validateAuthToken();
+            }
+        });
+
+        // Check auth when user navigates (browser back/forward)
+        window.addEventListener('popstate', function() {
+            setTimeout(() => {
+                checkPageAccess();
+            }, 100);
+        });
+
+        // Monitor for manual URL changes
+        let currentUrl = window.location.href;
+        setInterval(() => {
+            if (currentUrl !== window.location.href) {
+                currentUrl = window.location.href;
+                setTimeout(() => {
+                    checkPageAccess();
+                }, 100);
+            }
+        }, 500);
+
+        // Auto-refresh token validation every 5 minutes
+        setInterval(async () => {
+            if (authToken && currentUser) {
+                await validateAuthToken();
+            }
+        }, 300000); // 5 minut
 
         // Run access check on page load
         document.addEventListener('DOMContentLoaded', function() {
