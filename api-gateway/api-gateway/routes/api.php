@@ -16,7 +16,12 @@ Route::get('/test', function () {
         'timestamp' => now()
     ]);
 });
-
+// Authentication routes (proxy to User Service)
+Route::post('/auth/login', [GatewayController::class, 'userProxy']);
+Route::post('/auth/register', [GatewayController::class, 'userProxy']);
+Route::post('/auth/logout', [GatewayController::class, 'userProxy']);
+Route::get('/auth/me', [GatewayController::class, 'userProxy']);
+Route::post('/auth/refresh', [GatewayController::class, 'userProxy']); 
 // Combined dashboard endpoint
 Route::get('/dashboard', [GatewayController::class, 'dashboard']);
 
