@@ -68,7 +68,7 @@
         </div>
     </div>
 
-    <!-- Quick Actions -->
+    <!-- Quick Actions - FIXED NAVIGATION -->
     <div class="row mb-4">
         <div class="col-12">
             <div class="card">
@@ -77,13 +77,13 @@
                 </div>
                 <div class="card-body">
                     <div class="d-grid gap-2 d-md-flex">
-                        <a href="/creator/products" class="btn btn-success">
+                        <button class="btn btn-success" onclick="showCreateProductModal()">
                             <i class="fas fa-plus"></i> Add New Product
-                        </a>
-                        <a href="/products" class="btn btn-primary">
+                        </button>
+                        <a href="/products?creator_filter=my_products" class="btn btn-primary">
                             <i class="fas fa-box"></i> Manage My Products
                         </a>
-                        <a href="/orders" class="btn btn-info">
+                        <a href="/orders?creator_view=true" class="btn btn-info">
                             <i class="fas fa-chart-bar"></i> View Sales Reports
                         </a>
                         <button class="btn btn-outline-secondary" onclick="loadCreatorData()">
@@ -99,8 +99,9 @@
     <div class="row">
         <div class="col-md-6">
             <div class="card">
-                <div class="card-header">
+                <div class="card-header d-flex justify-content-between align-items-center">
                     <h5>My Recent Products</h5>
+                    <a href="/products?creator_filter=my_products" class="btn btn-sm btn-outline-primary">View All</a>
                 </div>
                 <div class="card-body">
                     <div id="myRecentProducts">
@@ -128,6 +129,110 @@
             </div>
         </div>
     </div>
+
+    <!-- Create Product Modal - ADDED -->
+    <div class="modal fade" id="createProductModal" tabindex="-1">
+        <div class="modal-dialog modal-xl">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h5 class="modal-title">Create New Product</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+                </div>
+                <form id="createProductForm" enctype="multipart/form-data">
+                    <div class="modal-body">
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="productName" class="form-label">Product Name</label>
+                                    <input type="text" class="form-control" id="productName" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="productCategory" class="form-label">Category</label>
+                                    <select class="form-control" id="productCategory">
+                                        <option value="">Select Category</option>
+                                        <option value="Graphics">Graphics</option>
+                                        <option value="Templates">Templates</option>
+                                        <option value="Photos">Photos</option>
+                                        <option value="Fonts">Fonts</option>
+                                        <option value="Icons">Icons</option>
+                                        <option value="UI Kits">UI Kits</option>
+                                        <option value="Other">Other</option>
+                                    </select>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="mb-3">
+                            <label for="productDescription" class="form-label">Description</label>
+                            <textarea class="form-control" id="productDescription" rows="3" required></textarea>
+                        </div>
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="productPrice" class="form-label">Price ($)</label>
+                                    <input type="number" class="form-control" id="productPrice" step="0.01" min="0" required>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="productTags" class="form-label">Tags (comma separated)</label>
+                                    <input type="text" class="form-control" id="productTags" placeholder="web, template, modern">
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- FILE UPLOAD SECTION - NEW -->
+                        <div class="mb-3">
+                            <label class="form-label">Product Files</label>
+                            <div class="border rounded p-3">
+                                <div class="mb-3">
+                                    <label for="productFiles" class="form-label">Main Product Files</label>
+                                    <input type="file" class="form-control" id="productFiles" multiple accept=".zip,.rar,.pdf,.psd,.ai,.eps">
+                                    <small class="form-text text-muted">Upload your main product files (ZIP, RAR, PDF, PSD, AI, EPS)</small>
+                                </div>
+                                <div class="mb-3">
+                                    <label for="previewFiles" class="form-label">Preview Files (Optional)</label>
+                                    <input type="file" class="form-control" id="previewFiles" multiple accept=".jpg,.jpeg,.png,.gif">
+                                    <small class="form-text text-muted">Upload preview images (JPG, PNG, GIF)</small>
+                                </div>
+                                <div id="filePreview" class="mt-3"></div>
+                            </div>
+                        </div>
+
+                        <div class="row">
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <label for="productStatus" class="form-label">Status</label>
+                                    <select class="form-control" id="productStatus" required>
+                                        <option value="draft">Draft</option>
+                                        <option value="published">Published</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="mb-3">
+                                    <div class="form-check mt-4">
+                                        <input class="form-check-input" type="checkbox" id="productFeatured" value="1">
+                                        <label class="form-check-label" for="productFeatured">
+                                            <strong>Featured Product</strong>
+                                            <br><small class="text-muted">This product will be highlighted</small>
+                                        </label>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="modal-footer">
+                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
+                        <button type="submit" class="btn btn-success">
+                            <i class="fas fa-plus"></i> Create Product
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
 @endsection
 
 @section('scripts')
@@ -144,6 +249,106 @@
             loadCreatorDashboard();
         });
 
+        // Show create product modal
+        function showCreateProductModal() {
+            const modal = new bootstrap.Modal(document.getElementById('createProductModal'));
+            modal.show();
+        }
+
+        // File preview functionality
+        document.getElementById('productFiles').addEventListener('change', function(e) {
+            showFilePreview(e.target.files, 'main');
+        });
+
+        document.getElementById('previewFiles').addEventListener('change', function(e) {
+            showFilePreview(e.target.files, 'preview');
+        });
+
+        function showFilePreview(files, type) {
+            const preview = document.getElementById('filePreview');
+            let html = `<h6>${type === 'main' ? 'Main Files' : 'Preview Files'}:</h6>`;
+            
+            for (let file of files) {
+                const size = (file.size / 1024 / 1024).toFixed(2);
+                html += `
+                    <div class="d-flex justify-content-between align-items-center p-2 border rounded mb-1">
+                        <span><i class="fas fa-file"></i> ${file.name}</span>
+                        <small class="text-muted">${size} MB</small>
+                    </div>
+                `;
+            }
+            
+            preview.innerHTML += html;
+        }
+
+        // Create product form submission with file upload
+        document.getElementById('createProductForm').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData();
+            
+            // Add text fields
+            formData.append('name', document.getElementById('productName').value);
+            formData.append('description', document.getElementById('productDescription').value);
+            formData.append('price', document.getElementById('productPrice').value);
+            formData.append('seller_id', currentUser.id);
+            formData.append('category', document.getElementById('productCategory').value);
+            formData.append('status', document.getElementById('productStatus').value);
+            formData.append('is_featured', document.getElementById('productFeatured').checked);
+            
+            // Add tags
+            const tags = document.getElementById('productTags').value
+                .split(',')
+                .map(tag => tag.trim())
+                .filter(tag => tag.length > 0);
+            formData.append('tags', JSON.stringify(tags));
+            
+            // Add files
+            const productFiles = document.getElementById('productFiles').files;
+            for (let file of productFiles) {
+                formData.append('product_files[]', file);
+            }
+            
+            const previewFiles = document.getElementById('previewFiles').files;
+            for (let file of previewFiles) {
+                formData.append('preview_files[]', file);
+            }
+
+            try {
+                const response = await fetch('/api/products', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${authToken}`,
+                        'X-CSRF-TOKEN': csrfToken
+                    },
+                    body: formData
+                });
+
+                const result = await response.json();
+
+                if (response.ok && result.success !== false) {
+                    showAlert('Product created successfully!', 'success');
+                    
+                    // Close modal
+                    const modal = bootstrap.Modal.getInstance(document.getElementById('createProductModal'));
+                    modal.hide();
+                    
+                    // Reset form
+                    document.getElementById('createProductForm').reset();
+                    document.getElementById('filePreview').innerHTML = '';
+                    
+                    // Reload dashboard data
+                    loadCreatorDashboard();
+                } else {
+                    const errorMsg = result.message || 'Failed to create product';
+                    showAlert(errorMsg, 'danger');
+                }
+            } catch (error) {
+                showAlert('Error creating product: ' + error.message, 'danger');
+            }
+        });
+
+        // Rest of the existing creator dashboard code...
         async function loadCreatorDashboard() {
             try {
                 await Promise.all([
@@ -214,7 +419,7 @@
 
                     if (myProducts.length === 0) {
                         container.innerHTML =
-                            '<p class="text-muted">No products yet. <a href="/products">Create your first product!</a></p>';
+                            '<p class="text-muted">No products yet. <button class="btn btn-link p-0" onclick="showCreateProductModal()">Create your first product!</button></p>';
                         return;
                     }
 
