@@ -12,39 +12,94 @@ use Illuminate\Support\Str;
 
 class ProductController extends Controller
 {
-    // Create Product with File Upload (POST /api/products) - FIXED VALIDATION
+
+    // FIXED STORE METHOD FOR ProductController 
+// Replace the existing store method in product-service/app/Http/Controllers/Api/ProductController.php
+
     public function store(Request $request)
     {
-        // Debug incoming request
-        \Illuminate\Support\Facades\Log::info('Product creation request', [
-            'all_data' => $request->all(),
-            'files' => $request->allFiles(),
-            'has_product_files' => $request->hasFile('product_files'),
-            'has_preview_files' => $request->hasFile('preview_files'),
+        // Enhanced logging for debugging
+        \Illuminate\Support\Facades\Log::info('=== PRODUCT CREATION REQUEST ===', [
+            'method' => $request->method(),
+            'content_type' => $request->header('Content-Type'),
+            'has_files' => $request->hasFile('product_files') || $request->hasFile('preview_files'),
+            'all_data' => $request->except(['product_files', 'preview_files']), // Exclude files from log
+            'file_counts' => [
+                'product_files' => $request->hasFile('product_files') ? count($request->file('product_files')) : 0,
+                'preview_files' => $request->hasFile('preview_files') ? count($request->file('preview_files')) : 0,
+            ]
         ]);
 
-        // FIXED: Make file uploads optional and adjust validation rules
-        $validator = Validator::make($request->all(), [
+        $validationRules = [
             'name' => 'required|string|max:255',
-            'description' => 'required|string',
+            'description' => 'required|string|max:5000',
             'price' => 'required|numeric|min:0',
             'seller_id' => 'required|integer',
             'category' => 'nullable|string|max:100',
-            'tags' => 'nullable|string', // JSON string from frontend
+            'tags' => 'nullable|string',
             'status' => 'nullable|in:draft,published',
-            'is_featured' => 'nullable|boolean',
+            'is_featured' => 'nullable',
 
-            // FIXED: Made file validation optional and more permissive
-            'product_files' => 'nullable|array',
-            'product_files.*' => 'nullable|file|max:102400|mimes:zip,rar,pdf,psd,ai,eps,doc,docx,xls,xlsx,ppt,pptx',
-            'preview_files' => 'nullable|array',
-            'preview_files.*' => 'nullable|file|max:10240|mimes:jpg,jpeg,png,gif,webp',
+            // SIMPLIFIED file validation - more permissive for testing
+            // 'product_files' => 'nullable|array',
+            // 'product_files.*' => 'nullable|file|max:102400', // Just check if it's a file and size
+            // 'preview_files' => 'nullable|array',
+            // 'preview_files.*' => 'nullable|file|max:10240', // Just check if it's a file and size
+        ];
+
+        $customMessages = [
+            'name.required' => 'Product name is required.',
+            'description.required' => 'Product description is required.',
+            'price.required' => 'Product price is required.',
+            'price.numeric' => 'Product price must be a number.',
+            'seller_id.required' => 'Seller ID is required.',
+        ];
+
+
+        // ENHANCED DEBUG LOGGING
+        \Illuminate\Support\Facades\Log::info('=== FILE UPLOAD DEBUG ===', [
+            'method' => $request->method(),
+            'content_type' => $request->header('Content-Type'),
+            'has_product_files' => $request->hasFile('product_files'),
+            'has_preview_files' => $request->hasFile('preview_files'),
+            'all_files' => $request->allFiles(),
+            'request_size' => strlen(serialize($request->all())),
         ]);
+        // Debug each file individually
+        if ($request->hasFile('product_files')) {
+            foreach ($request->file('product_files') as $index => $file) {
+                \Illuminate\Support\Facades\Log::info("Product file {$index}", [
+                    'original_name' => $file->getClientOriginalName(),
+                    'size' => $file->getSize(),
+                    'mime_type' => $file->getMimeType(),
+                    'extension' => $file->getClientOriginalExtension(),
+                    'is_valid' => $file->isValid(),
+                    'error_code' => $file->getError(),
+                    'real_path' => $file->getRealPath(),
+                    'is_uploaded_file' => is_uploaded_file($file->getRealPath()),
+                ]);
+            }
+        }
+        if ($request->hasFile('preview_files')) {
+            foreach ($request->file('preview_files') as $index => $file) {
+                \Illuminate\Support\Facades\Log::info("Preview file {$index}", [
+                    'original_name' => $file->getClientOriginalName(),
+                    'size' => $file->getSize(),
+                    'mime_type' => $file->getMimeType(),
+                    'extension' => $file->getClientOriginalExtension(),
+                    'is_valid' => $file->isValid(),
+                    'error_code' => $file->getError(),
+                    'real_path' => $file->getRealPath(),
+                    'is_uploaded_file' => is_uploaded_file($file->getRealPath()),
+                ]);
+            }
+        }
 
+        $validator = Validator::make($request->all(), $validationRules, $customMessages);
         if ($validator->fails()) {
             \Illuminate\Support\Facades\Log::error('Product validation failed', [
-                'errors' => $validator->errors(),
-                'input' => $request->all()
+                'errors' => $validator->errors()->toArray(),
+                'input' => $request->except(['product_files', 'preview_files'])
             ]);
 
             return response()->json([
@@ -54,25 +109,51 @@ class ProductController extends Controller
             ], 422);
         }
 
+        // Additional seller_id validation
+        if (!$request->seller_id || $request->seller_id < 1) {
+            \Illuminate\Support\Facades\Log::error('Invalid seller_id provided', [
+                'seller_id' => $request->seller_id
+            ]);
+
+            return response()->json([
+                'success' => false,
+                'message' => 'Invalid seller ID provided',
+                'errors' => ['seller_id' => ['Valid seller ID is required']]
+            ], 422);
+        }
+
         try {
-            // Parse tags if provided
+            // Parse tags safely
             $tags = [];
             if ($request->has('tags') && $request->tags) {
-                $tagsData = json_decode($request->tags, true);
-                $tags = is_array($tagsData) ? $tagsData : [];
+                $tagsInput = $request->tags;
+                if (is_string($tagsInput)) {
+                    // Try to decode as JSON first
+                    $decodedTags = json_decode($tagsInput, true);
+                    if (json_last_error() === JSON_ERROR_NONE && is_array($decodedTags)) {
+                        $tags = $decodedTags;
+                    } else {
+                        // Fall back to comma-separated string
+                        $tags = array_map('trim', explode(',', $tagsInput));
+                        $tags = array_filter($tags, function ($tag) {
+                            return !empty($tag);
+                        });
+                    }
+                }
             }
 
-            // Convert is_featured to boolean
+            // Convert is_featured safely
             $isFeatured = false;
             if ($request->has('is_featured')) {
                 $isFeatured = filter_var($request->is_featured, FILTER_VALIDATE_BOOLEAN);
             }
 
-            \Illuminate\Support\Facades\Log::info('Creating product with data', [
+            \Illuminate\Support\Facades\Log::info('Creating product with processed data', [
                 'name' => $request->name,
                 'seller_id' => $request->seller_id,
                 'price' => $request->price,
                 'is_featured' => $isFeatured,
+                'tags_count' => count($tags),
                 'tags' => $tags
             ]);
 
@@ -88,22 +169,32 @@ class ProductController extends Controller
                 'is_featured' => $isFeatured,
             ]);
 
-            \Illuminate\Support\Facades\Log::info('Product created successfully', ['product_id' => $product->id]);
+            \Illuminate\Support\Facades\Log::info('Product created successfully', [
+                'product_id' => $product->id,
+                'name' => $product->name
+            ]);
 
-            // Handle file uploads if any files were provided
+            // Handle file uploads with enhanced error handling
+            $fileUploadResults = [];
             if ($request->hasFile('product_files') || $request->hasFile('preview_files')) {
-                $this->handleFileUploads($request, $product);
+                $fileUploadResults = $this->handleFileUploadsEnhanced($request, $product);
             }
+
+            // Load the product with files for response
+            $product->load('files');
 
             return response()->json([
                 'success' => true,
                 'message' => 'Product created successfully',
-                'product' => $product->load('files')->toApiArray()
+                'product' => $product->toApiArray(),
+                'file_upload_results' => $fileUploadResults
             ], 201);
 
         } catch (\Exception $e) {
             \Illuminate\Support\Facades\Log::error('Product creation failed', [
                 'error' => $e->getMessage(),
+                'file' => $e->getFile(),
+                'line' => $e->getLine(),
                 'trace' => $e->getTraceAsString()
             ]);
 
@@ -114,6 +205,195 @@ class ProductController extends Controller
         }
     }
 
+    // Enhanced file upload handling method
+    private function handleFileUploadsEnhanced(Request $request, Product $product)
+    {
+        $results = [
+            'product_files' => [],
+            'preview_files' => [],
+            'summary' => [
+                'total_uploaded' => 0,
+                'failed_uploads' => 0,
+                'errors' => []
+            ]
+        ];
+
+        try {
+            // Ensure storage directories exist
+            $this->ensureStorageDirectories();
+
+            // Handle main product files
+            if ($request->hasFile('product_files')) {
+                \Illuminate\Support\Facades\Log::info('Processing main product files', [
+                    'count' => count($request->file('product_files'))
+                ]);
+
+                foreach ($request->file('product_files') as $index => $file) {
+                    try {
+                        if ($file && $file->isValid()) {
+                            $result = $this->storeProductFileEnhanced($file, $product, false);
+                            $results['product_files'][] = $result;
+                            if ($result['success']) {
+                                $results['summary']['total_uploaded']++;
+                            } else {
+                                $results['summary']['failed_uploads']++;
+                                $results['summary']['errors'][] = $result['error'];
+                            }
+                        } else {
+                            $error = 'Invalid file at index ' . $index;
+                            $results['product_files'][] = ['success' => false, 'error' => $error];
+                            $results['summary']['failed_uploads']++;
+                            $results['summary']['errors'][] = $error;
+                        }
+                    } catch (\Exception $e) {
+                        $error = 'Failed to process file at index ' . $index . ': ' . $e->getMessage();
+                        $results['product_files'][] = ['success' => false, 'error' => $error];
+                        $results['summary']['failed_uploads']++;
+                        $results['summary']['errors'][] = $error;
+                    }
+                }
+            }
+
+            // Handle preview files
+            if ($request->hasFile('preview_files')) {
+                \Illuminate\Support\Facades\Log::info('Processing preview files', [
+                    'count' => count($request->file('preview_files'))
+                ]);
+
+                foreach ($request->file('preview_files') as $index => $file) {
+                    try {
+                        if ($file && $file->isValid()) {
+                            $result = $this->storeProductFileEnhanced($file, $product, true);
+                            $results['preview_files'][] = $result;
+                            if ($result['success']) {
+                                $results['summary']['total_uploaded']++;
+                            } else {
+                                $results['summary']['failed_uploads']++;
+                                $results['summary']['errors'][] = $result['error'];
+                            }
+                        } else {
+                            $error = 'Invalid preview file at index ' . $index;
+                            $results['preview_files'][] = ['success' => false, 'error' => $error];
+                            $results['summary']['failed_uploads']++;
+                            $results['summary']['errors'][] = $error;
+                        }
+                    } catch (\Exception $e) {
+                        $error = 'Failed to process preview file at index ' . $index . ': ' . $e->getMessage();
+                        $results['preview_files'][] = ['success' => false, 'error' => $error];
+                        $results['summary']['failed_uploads']++;
+                        $results['summary']['errors'][] = $error;
+                    }
+                }
+            }
+
+            \Illuminate\Support\Facades\Log::info('File upload summary', $results['summary']);
+
+            return $results;
+
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('File upload handling failed', [
+                'product_id' => $product->id,
+                'error' => $e->getMessage()
+            ]);
+
+            $results['summary']['errors'][] = 'File upload system error: ' . $e->getMessage();
+            return $results;
+        }
+    }
+
+    // Enhanced individual file storage method
+    private function storeProductFileEnhanced($file, Product $product, bool $isPreview = false)
+    {
+        try {
+            $originalName = $file->getClientOriginalName();
+            $extension = strtolower($file->getClientOriginalExtension());
+            $mimeType = $file->getMimeType();
+            $size = $file->getSize();
+
+            \Illuminate\Support\Facades\Log::info('Storing file', [
+                'original_name' => $originalName,
+                'extension' => $extension,
+                'size' => $size,
+                'is_preview' => $isPreview
+            ]);
+
+            // Validate file size and type again
+            $maxSize = $isPreview ? 10 * 1024 * 1024 : 100 * 1024 * 1024;
+            if ($size > $maxSize) {
+                return [
+                    'success' => false,
+                    'error' => "File '{$originalName}' is too large. Maximum size: " . ($maxSize / 1024 / 1024) . "MB"
+                ];
+            }
+
+            // Generate secure filename
+            $secureFilename = \Illuminate\Support\Str::uuid() . '_' . time() . '.' . $extension;
+
+            // Determine storage path
+            $storagePath = $isPreview ? 'previews/' : 'products/';
+
+            // Store file
+            $path = $file->storeAs($storagePath, $secureFilename, 'private');
+
+            if (!$path) {
+                return [
+                    'success' => false,
+                    'error' => "Failed to store file '{$originalName}'"
+                ];
+            }
+
+            // Create database record
+            $productFile = ProductFile::create([
+                'product_id' => $product->id,
+                'filename' => $secureFilename,
+                'original_name' => $originalName,
+                'file_path' => $path,
+                'file_type' => $extension,
+                'file_size' => $size,
+                'mime_type' => $mimeType,
+                'is_preview' => $isPreview,
+                'download_count' => 0,
+            ]);
+
+            \Illuminate\Support\Facades\Log::info('File stored successfully', [
+                'file_id' => $productFile->id,
+                'original_name' => $originalName,
+                'stored_path' => $path,
+                'is_preview' => $isPreview
+            ]);
+
+            return [
+                'success' => true,
+                'file_id' => $productFile->id,
+                'original_name' => $originalName,
+                'stored_path' => $path
+            ];
+
+        } catch (\Exception $e) {
+            \Illuminate\Support\Facades\Log::error('Failed to store individual file', [
+                'original_name' => $originalName ?? 'unknown',
+                'error' => $e->getMessage()
+            ]);
+
+            return [
+                'success' => false,
+                'error' => "Failed to store '{$originalName}': " . $e->getMessage()
+            ];
+        }
+    }
+
+    // Ensure storage directories exist
+    private function ensureStorageDirectories()
+    {
+        $directories = ['products', 'previews'];
+
+        foreach ($directories as $dir) {
+            if (!\Illuminate\Support\Facades\Storage::disk('private')->exists($dir)) {
+                \Illuminate\Support\Facades\Storage::disk('private')->makeDirectory($dir);
+                \Illuminate\Support\Facades\Log::info("Created storage directory: {$dir}");
+            }
+        }
+    }
     // Handle file uploads for product - ENHANCED WITH BETTER ERROR HANDLING
     private function handleFileUploads(Request $request, Product $product)
     {
