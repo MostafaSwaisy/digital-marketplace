@@ -282,72 +282,332 @@
         }
 
         // Create product form submission with file upload
-        document.getElementById('createProductForm').addEventListener('submit', async function(e) {
-            e.preventDefault();
-            
-            const formData = new FormData();
-            
-            // Add text fields
-            formData.append('name', document.getElementById('productName').value);
-            formData.append('description', document.getElementById('productDescription').value);
-            formData.append('price', document.getElementById('productPrice').value);
-            formData.append('seller_id', currentUser.id);
-            formData.append('category', document.getElementById('productCategory').value);
-            formData.append('status', document.getElementById('productStatus').value);
-            formData.append('is_featured', document.getElementById('productFeatured').checked);
-            
-            // Add tags
-            const tags = document.getElementById('productTags').value
+       // Fixed Create Product Form Submission with Enhanced Error Handling
+document.getElementById('createProductForm').addEventListener('submit', async function(e) {
+    e.preventDefault();
+    
+    console.log('=== FORM SUBMISSION STARTED ===');
+    
+    // Validate required fields first
+    const name = document.getElementById('productName').value.trim();
+    const description = document.getElementById('productDescription').value.trim();
+    const price = document.getElementById('productPrice').value;
+    const category = document.getElementById('productCategory').value;
+    const status = document.getElementById('productStatus').value;
+    
+    // Client-side validation
+    if (!name) {
+        showAlert('Product name is required', 'danger');
+        return;
+    }
+    
+    if (!description) {
+        showAlert('Product description is required', 'danger');
+        return;
+    }
+    
+    if (!price || parseFloat(price) < 0) {
+        showAlert('Valid price is required', 'danger');
+        return;
+    }
+    
+    if (!currentUser || !currentUser.id) {
+        showAlert('User authentication error. Please login again.', 'danger');
+        return;
+    }
+    
+    console.log('Client validation passed');
+    
+    try {
+        const formData = new FormData();
+        
+        // Add text fields with proper validation
+        formData.append('name', name);
+        formData.append('description', description);
+        formData.append('price', parseFloat(price));
+        formData.append('seller_id', parseInt(currentUser.id));
+        formData.append('category', category || '');
+        formData.append('status', status || 'draft');
+        formData.append('is_featured', document.getElementById('productFeatured').checked ? '1' : '0');
+        
+        // Handle tags properly
+        const tagsInput = document.getElementById('productTags').value.trim();
+        let tags = [];
+        if (tagsInput) {
+            tags = tagsInput
                 .split(',')
                 .map(tag => tag.trim())
                 .filter(tag => tag.length > 0);
-            formData.append('tags', JSON.stringify(tags));
-            
-            // Add files
-            const productFiles = document.getElementById('productFiles').files;
-            for (let file of productFiles) {
-                formData.append('product_files[]', file);
-            }
-            
-            const previewFiles = document.getElementById('previewFiles').files;
-            for (let file of previewFiles) {
-                formData.append('preview_files[]', file);
-            }
-
-            try {
-                const response = await fetch('/api/products', {
-                    method: 'POST',
-                    headers: {
-                        'Authorization': `Bearer ${authToken}`,
-                        'X-CSRF-TOKEN': csrfToken
-                    },
-                    body: formData
-                });
-
-                const result = await response.json();
-
-                if (response.ok && result.success !== false) {
-                    showAlert('Product created successfully!', 'success');
-                    
-                    // Close modal
-                    const modal = bootstrap.Modal.getInstance(document.getElementById('createProductModal'));
-                    modal.hide();
-                    
-                    // Reset form
-                    document.getElementById('createProductForm').reset();
-                    document.getElementById('filePreview').innerHTML = '';
-                    
-                    // Reload dashboard data
-                    loadCreatorDashboard();
-                } else {
-                    const errorMsg = result.message || 'Failed to create product';
-                    showAlert(errorMsg, 'danger');
-                }
-            } catch (error) {
-                showAlert('Error creating product: ' + error.message, 'danger');
-            }
+        }
+        formData.append('tags', JSON.stringify(tags));
+        
+        console.log('Form data prepared:', {
+            name: name,
+            description: description.substring(0, 50) + '...',
+            price: price,
+            seller_id: currentUser.id,
+            category: category,
+            tags: tags,
+            status: status
         });
+        
+        // Handle file uploads with validation
+        const productFiles = document.getElementById('productFiles').files;
+        const previewFiles = document.getElementById('previewFiles').files;
+        
+        console.log('Files to upload:', {
+            productFiles: productFiles.length,
+            previewFiles: previewFiles.length
+        });
+        
+        // Validate file types and sizes
+        const allowedMainTypes = ['zip', 'rar', 'pdf', 'psd', 'ai', 'eps', 'doc', 'docx'];
+        const allowedPreviewTypes = ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+        const maxMainFileSize = 100 * 1024 * 1024; // 100MB
+        const maxPreviewFileSize = 10 * 1024 * 1024; // 10MB
+        
+        // Validate main files
+        for (let i = 0; i < productFiles.length; i++) {
+            const file = productFiles[i];
+            const extension = file.name.split('.').pop().toLowerCase();
+            
+            if (!allowedMainTypes.includes(extension)) {
+                showAlert(`Invalid file type: ${file.name}. Allowed types: ${allowedMainTypes.join(', ')}`, 'danger');
+                return;
+            }
+            
+            if (file.size > maxMainFileSize) {
+                showAlert(`File too large: ${file.name}. Maximum size is 100MB.`, 'danger');
+                return;
+            }
+            
+            formData.append('product_files[]', file);
+        }
+        
+        // Validate preview files
+        for (let i = 0; i < previewFiles.length; i++) {
+            const file = previewFiles[i];
+            const extension = file.name.split('.').pop().toLowerCase();
+            
+            if (!allowedPreviewTypes.includes(extension)) {
+                showAlert(`Invalid preview file type: ${file.name}. Allowed types: ${allowedPreviewTypes.join(', ')}`, 'danger');
+                return;
+            }
+            
+            if (file.size > maxPreviewFileSize) {
+                showAlert(`Preview file too large: ${file.name}. Maximum size is 10MB.`, 'danger');
+                return;
+            }
+            
+            formData.append('preview_files[]', file);
+        }
+        
+        console.log('File validation passed');
+        
+        // Show loading state
+        const submitBtn = document.querySelector('#createProductForm button[type="submit"]');
+        const originalText = submitBtn.innerHTML;
+        submitBtn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Creating...';
+        submitBtn.disabled = true;
+        
+        console.log('Making API request to /api/products');
+        
+        // Make the request
+        const response = await fetch('/api/products', {
+            method: 'POST',
+            headers: {
+                'Authorization': `Bearer ${authToken}`,
+                'X-CSRF-TOKEN': csrfToken,
+                'Accept': 'application/json'
+                // Don't set Content-Type for FormData - browser will set it with boundary
+            },
+            body: formData
+        });
+        
+        console.log('Response status:', response.status);
+        console.log('Response ok:', response.ok);
+        
+        let result;
+        try {
+            result = await response.json();
+            console.log('Response data:', result);
+        } catch (jsonError) {
+            console.error('Failed to parse JSON response:', jsonError);
+            const textResponse = await response.text();
+            console.log('Raw response:', textResponse);
+            throw new Error('Invalid JSON response from server');
+        }
+        
+        // Reset button state
+        submitBtn.innerHTML = originalText;
+        submitBtn.disabled = false;
+        
+        if (response.ok && result.success !== false) {
+            console.log('=== SUCCESS ===');
+            showAlert('Product created successfully!', 'success');
+            
+            // Close modal
+            const modal = bootstrap.Modal.getInstance(document.getElementById('createProductModal'));
+            if (modal) {
+                modal.hide();
+            }
+            
+            // Reset form
+            document.getElementById('createProductForm').reset();
+            document.getElementById('filePreview').innerHTML = '';
+            
+            // Reload dashboard data
+            loadCreatorDashboard();
+            
+        } else {
+            console.log('=== FAILURE ===');
+            console.log('Error result:', result);
+            
+            let errorMsg = 'Failed to create product';
+            
+            if (result.errors) {
+                // Laravel validation errors
+                const errorMessages = [];
+                for (const field in result.errors) {
+                    if (result.errors[field] && Array.isArray(result.errors[field])) {
+                        errorMessages.push(...result.errors[field]);
+                    }
+                }
+                if (errorMessages.length > 0) {
+                    errorMsg = errorMessages.join(', ');
+                }
+            } else if (result.message) {
+                errorMsg = result.message;
+            }
+            
+            showAlert(errorMsg, 'danger');
+        }
+        
+    } catch (error) {
+        console.error('=== EXCEPTION ===');
+        console.error('Upload error:', error);
+        
+        // Reset button state
+        const submitBtn = document.querySelector('#createProductForm button[type="submit"]');
+        if (submitBtn) {
+            submitBtn.innerHTML = '<i class="fas fa-plus"></i> Create Product';
+            submitBtn.disabled = false;
+        }
+        
+        showAlert('Error creating product: ' + error.message, 'danger');
+    }
+});
 
+// Enhanced file preview with better validation feedback
+function showFilePreview(files, type) {
+    const preview = document.getElementById('filePreview');
+    
+    if (files.length === 0) {
+        return;
+    }
+    
+    let html = `<div class="mt-3"><h6>${type === 'main' ? 'Main Files' : 'Preview Files'}:</h6>`;
+    
+    for (let file of files) {
+        const size = (file.size / 1024 / 1024).toFixed(2);
+        const extension = file.name.split('.').pop().toLowerCase();
+        
+        // Check file type
+        const allowedTypes = type === 'main' 
+            ? ['zip', 'rar', 'pdf', 'psd', 'ai', 'eps', 'doc', 'docx']
+            : ['jpg', 'jpeg', 'png', 'gif', 'webp'];
+        
+        const maxSize = type === 'main' ? 100 : 10; // MB
+        const isValidType = allowedTypes.includes(extension);
+        const isValidSize = parseFloat(size) <= maxSize;
+        
+        const statusClass = isValidType && isValidSize ? 'border-success' : 'border-danger';
+        const statusIcon = isValidType && isValidSize ? 'fa-check text-success' : 'fa-times text-danger';
+        
+        html += `
+            <div class="d-flex justify-content-between align-items-center p-2 border rounded mb-1 ${statusClass}">
+                <div>
+                    <span><i class="fas fa-file"></i> ${file.name}</span>
+                    ${!isValidType ? '<br><small class="text-danger">Invalid file type</small>' : ''}
+                    ${!isValidSize ? `<br><small class="text-danger">Too large (max ${maxSize}MB)</small>` : ''}
+                </div>
+                <div class="text-end">
+                    <i class="fas ${statusIcon}"></i>
+                    <br><small class="text-muted">${size} MB</small>
+                </div>
+            </div>
+        `;
+    }
+    
+    html += '</div>';
+    preview.innerHTML += html;
+}
+
+// Enhanced API call function with better error handling
+async function enhancedApiCall(url, method = 'GET', data = null, isFormData = false) {
+    const options = {
+        method: method,
+        headers: {
+            'Accept': 'application/json',
+            'X-CSRF-TOKEN': csrfToken
+        }
+    };
+
+    // Add authorization header if we have a token
+    if (authToken) {
+        options.headers['Authorization'] = `Bearer ${authToken}`;
+    }
+
+    // Handle different data types
+    if (data) {
+        if (isFormData) {
+            // Don't set Content-Type for FormData
+            options.body = data;
+        } else {
+            options.headers['Content-Type'] = 'application/json';
+            options.body = JSON.stringify(data);
+        }
+    }
+
+    try {
+        console.log(`Enhanced API Call: ${method} ${url}`);
+        const response = await fetch(url, options);
+        
+        let result;
+        try {
+            result = await response.json();
+        } catch (e) {
+            const text = await response.text();
+            console.error('Failed to parse JSON. Raw response:', text);
+            throw new Error('Invalid JSON response');
+        }
+
+        console.log(`API Response (${response.status}):`, result);
+
+        // Handle token expiration
+        if (response.status === 401 && authToken) {
+            console.log('Token expired, logging out...');
+            logout();
+            return {
+                success: false,
+                error: 'Session expired'
+            };
+        }
+
+        return {
+            success: response.ok,
+            data: result,
+            status: response.status,
+            response: response
+        };
+    } catch (error) {
+        console.error('Enhanced API call failed:', error);
+        return {
+            success: false,
+            error: error.message
+        };
+    }
+}
         // Rest of the existing creator dashboard code...
         async function loadCreatorDashboard() {
             try {
